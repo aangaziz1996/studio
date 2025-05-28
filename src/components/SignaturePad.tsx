@@ -1,11 +1,12 @@
+
 "use client";
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Eraser, Save } from 'lucide-react';
+import { Eraser, CheckCircle } from 'lucide-react'; // Changed Save to CheckCircle for visual cue
 
 interface SignaturePadProps {
-  onSave: (signature: string) => void;
+  onSave: (signature: string, isEmpty: boolean) => void;
   width?: number;
   height?: number;
   backgroundColor?: string;
@@ -14,47 +15,62 @@ interface SignaturePadProps {
 
 const SignaturePad: React.FC<SignaturePadProps> = ({
   onSave,
-  width = 300,
-  height = 150,
-  backgroundColor = 'hsl(var(--muted))', // Use theme color
-  penColor = 'hsl(var(--foreground))', // Use theme color
+  width = 300, // Default width
+  height = 150, // Default height
+  backgroundColor = 'hsl(var(--muted))',
+  penColor = 'hsl(var(--foreground))',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isEmpty, setIsEmpty] = useState(true);
 
-  useEffect(() => {
+  const actualWidth = typeof window !== 'undefined' ? Math.min(width, window.innerWidth - 64) : width; // 32px padding on each side
+
+  const initializeCanvas = () => {
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        // Clear rect with background color
         ctx.fillStyle = backgroundColor;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Set drawing styles
         ctx.strokeStyle = penColor;
         ctx.lineWidth = 2;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+        setIsEmpty(true); // Canvas is empty after clear
       }
     }
-  }, [backgroundColor, penColor, width, height]); // Redraw background if props change
+  };
+
+  useEffect(() => {
+    initializeCanvas();
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backgroundColor, penColor, actualWidth, height]); // Rerun if these change
 
   const getCoordinates = (event: React.MouseEvent | React.TouchEvent): { x: number; y: number } | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    if ('touches' in event) { // Touch event
-      return {
-        x: event.touches[0].clientX - rect.left,
-        y: event.touches[0].clientY - rect.top,
-      };
+    let clientX, clientY;
+    if ('touches' in event) { 
+      if (event.touches.length === 0) return null;
+      clientX = event.touches[0].clientX;
+      clientY = event.touches[0].clientY;
+    } else {
+      clientX = event.clientX;
+      clientY = event.clientY;
     }
-    // Mouse event
     return {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
+      x: clientX - rect.left,
+      y: clientY - rect.top,
     };
   };
 
   const startDrawing = (event: React.MouseEvent | React.TouchEvent) => {
+    event.preventDefault(); // Prevent scrolling on touch
     const coords = getCoordinates(event);
     if (!coords) return;
     const { x, y } = coords;
@@ -63,13 +79,15 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
       ctx.beginPath();
       ctx.moveTo(x, y);
       setIsDrawing(true);
+      setIsEmpty(false); // Drawing started, no longer empty
     }
   };
 
   const draw = (event: React.MouseEvent | React.TouchEvent) => {
+    event.preventDefault(); // Prevent scrolling on touch
     if (!isDrawing) return;
     const coords = getCoordinates(event);
-    if (!coords) return;
+    if (!coords) return; // Can happen if touch ends outside
     const { x, y } = coords;
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
@@ -87,29 +105,26 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
   };
 
   const handleClear = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = backgroundColor;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-    }
+    initializeCanvas();
+    onSave("", true); // Notify parent that canvas is cleared
   };
 
   const handleSave = () => {
     const canvas = canvasRef.current;
     if (canvas) {
-      const dataUrl = canvas.toDataURL('image/png');
-      onSave(dataUrl);
+      // Check if canvas is effectively empty (e.g., all pixels are background color)
+      // For simplicity, we'll rely on the isEmpty state which is set when drawing starts.
+      // A more robust check would involve getImageData().
+      const dataUrl = isEmpty ? "" : canvas.toDataURL('image/png');
+      onSave(dataUrl, isEmpty);
     }
   };
 
   return (
-    <div className="flex flex-col items-center space-y-2">
+    <div className="flex flex-col items-center space-y-3 w-full max-w-xs sm:max-w-sm md:max-w-md">
       <canvas
         ref={canvasRef}
-        width={width}
+        width={actualWidth} 
         height={height}
         onMouseDown={startDrawing}
         onMouseMove={draw}
@@ -118,15 +133,15 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
         onTouchStart={startDrawing}
         onTouchMove={draw}
         onTouchEnd={stopDrawing}
-        className="border border-input rounded-md cursor-crosshair"
-        style={{ touchAction: 'none' }} // Prevents page scrolling on touch devices
+        className="border border-input rounded-md cursor-crosshair bg-card shadow-inner"
+        style={{ touchAction: 'none' }}
       />
-      <div className="flex space-x-2">
-        <Button variant="outline" size="sm" onClick={handleClear}>
-          <Eraser className="mr-2 h-4 w-4" /> Clear
+      <div className="flex space-x-3 w-full">
+        <Button variant="outline" size="default" onClick={handleClear} className="flex-1">
+          <Eraser className="mr-2 h-4 w-4" /> Bersihkan
         </Button>
-        <Button size="sm" onClick={handleSave}>
-          <Save className="mr-2 h-4 w-4" /> Save Signature
+        <Button size="default" onClick={handleSave} className="flex-1 bg-green-600 hover:bg-green-700 text-white">
+          <CheckCircle className="mr-2 h-4 w-4" /> Simpan TTD
         </Button>
       </div>
     </div>
