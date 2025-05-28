@@ -11,7 +11,7 @@ import { id as indonesiaLocale } from 'date-fns/locale';
 import { Button } from "@/components/ui/button";
 import { AppLogo } from "@/components/AppLogo";
 import { PaymentDialog } from "@/components/PaymentDialog";
-import { CustomerForm } from "@/components/CustomerForm";
+import { CustomerForm, type CustomerFormValues } from "@/components/CustomerForm";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -40,9 +40,9 @@ export default function CustomerDetailPage() {
     const foundCustomer = customers.find(c => c.id === customerId);
     if (foundCustomer) {
       setCustomer(foundCustomer);
-    } else if (customers.length > 0 && !foundCustomer) { // Only redirect if customers are loaded and not found
+    } else if (customers.length > 0 && !foundCustomer) { 
       toast({ title: "Error", description: "Pelanggan tidak ditemukan.", variant: "destructive" });
-      router.replace("/"); // Use replace to not add to history
+      router.replace("/"); 
     }
   }, [customerId, customers, router, toast]);
 
@@ -61,9 +61,9 @@ export default function CustomerDetailPage() {
         c.id === customer.id
           ? {
               ...c,
-              status: "Paid",
-              paymentHistory: [...c.paymentHistory, newPayment].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()), // Sort by date descending
-              nextPaymentDate: formatISO(addMonths(new Date(c.nextPaymentDate), 1))
+              status: "Paid", // Automatically set to Paid on new payment
+              paymentHistory: [...c.paymentHistory, newPayment].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()),
+              nextPaymentDate: formatISO(addMonths(parseISO(c.nextPaymentDate), 1)) // Ensure nextPaymentDate is parsed before adding months
             }
           : c
       )
@@ -72,18 +72,19 @@ export default function CustomerDetailPage() {
     setIsPaymentDialogOpen(false);
   };
   
-  const handleSaveCustomer = (data: Omit<Customer, "id" | "status" | "nextPaymentDate" | "paymentHistory"> & { installationDate: string }) => {
+  // Updated to accept CustomerFormValues (name, phoneNumber, email, address, plan, status)
+  const handleSaveCustomer = (data: CustomerFormValues) => {
     if (!customer) return;
     setCustomers(prev => 
       prev.map(c => c.id === customer.id ? { 
-          ...customer, // Keep existing status, payment history, nextPaymentDate unless specifically changed by form logic
+          ...customer, // Keep existing full customer data
+          // Update only fields from the form
           name: data.name,
           phoneNumber: data.phoneNumber,
           email: data.email,
           address: data.address,
           plan: data.plan,
-          installationDate: data.installationDate, // This is string from form
-          monthlyFee: Number(data.monthlyFee) 
+          status: data.status, // Update status from form
       } : c)
     );
     toast({ title: "Pelanggan Diperbarui", description: `Detail ${data.name} telah diperbarui.` });
@@ -104,13 +105,13 @@ export default function CustomerDetailPage() {
   };
 
 
-  if (!customer && customers.length === 0) { // Still loading customers or customerId is invalid early
+  if (!customer && customers.length === 0) { 
     return <div className="flex items-center justify-center min-h-screen"><p>Memuat data pelanggan...</p></div>;
   }
-  if (!customer && customers.length > 0) { // Customers loaded, but this one not found (already handled by useEffect redirect, but as a fallback)
+  if (!customer && customers.length > 0) { 
      return <div className="flex items-center justify-center min-h-screen"><p>Pelanggan tidak ditemukan.</p></div>;
   }
-  if (!customer) return null; // Should be caught by above, but good practice
+  if (!customer) return null; 
 
   const paymentStatusText = customer.status === "Paid" ? "Lunas" : 
                             customer.status === "Overdue" ? "Jatuh Tempo" : "Belum Dibayar";
@@ -128,7 +129,6 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      {/* Header */}
       <header className="sticky top-0 z-50 flex items-center justify-between p-4 border-b bg-white shadow-sm">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-6 w-6" />
@@ -144,13 +144,11 @@ export default function CustomerDetailPage() {
         </div>
       </header>
 
-      <ScrollArea className="flex-grow pb-24"> {/* Added pb for action buttons */}
-        {/* Banner */}
+      <ScrollArea className="flex-grow pb-24">
         <div className="bg-emerald-700 text-white py-8 px-4 flex flex-col items-center justify-center">
-          <AppLogo className="text-white" iconClassName="h-12 w-12" textClassName="text-4xl"/>
+          <AppLogo hideIcon subtitle="Natural" textClassName="text-4xl text-white" subtitleClassName="text-sm text-white opacity-90 tracking-wider" className="text-white"/>
         </div>
 
-        {/* Avatar and Basic Info */}
         <div className="flex flex-col items-center p-6 bg-white -mt-12 mx-4 rounded-lg shadow-lg relative z-10">
           <Image
             src={`https://placehold.co/100x100.png`}
@@ -165,7 +163,6 @@ export default function CustomerDetailPage() {
           <p className="text-sm text-muted-foreground text-center mt-1">{customer.address}</p>
         </div>
 
-        {/* Informasi Kontak */}
         <div className="p-4 mt-6">
           <h3 className="text-xl font-semibold mb-3 text-slate-800 px-2">Informasi Kontak</h3>
           <div className="bg-white rounded-lg shadow p-2">
@@ -178,7 +175,6 @@ export default function CustomerDetailPage() {
           </div>
         </div>
         
-        {/* Status Pembayaran */}
         <div className="p-4 mt-2">
           <h3 className="text-xl font-semibold mb-3 text-slate-800 px-2">Status Pembayaran</h3>
           <div className="bg-white rounded-lg shadow p-4">
@@ -199,7 +195,6 @@ export default function CustomerDetailPage() {
           </div>
         </div>
 
-        {/* Riwayat Pembayaran */}
         <div className="p-4 mt-2">
           <h3 className="text-xl font-semibold mb-3 text-slate-800 px-2">Riwayat Pembayaran</h3>
           <div className="bg-white rounded-lg shadow p-2">
@@ -220,7 +215,6 @@ export default function CustomerDetailPage() {
         </div>
       </ScrollArea>
 
-      {/* Action Buttons - Fixed Footer */}
       <div className="fixed bottom-0 left-0 right-0 bg-white p-4 border-t shadow-md-top flex space-x-3 z-20">
         <Button 
           className="flex-1 bg-blue-500 hover:bg-blue-600 text-white" 
@@ -257,8 +251,8 @@ export default function CustomerDetailPage() {
         isOpen={isCustomerFormOpen}
         onClose={() => setIsCustomerFormOpen(false)}
         onSubmit={handleSaveCustomer}
-        defaultValues={customer} // Pass current customer data for editing
-        onDelete={undefined} // Delete is handled by button on this page
+        defaultValues={customer} 
+        onDelete={undefined} 
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -281,3 +275,4 @@ export default function CustomerDetailPage() {
     </div>
   );
 }
+
