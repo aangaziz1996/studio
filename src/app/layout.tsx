@@ -26,8 +26,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id"> {/* Changed lang to id */}
-      <body className={`${geistSans.variable} font-sans antialiased`}> {/* Use font-sans from variable */}
+    <html lang="id">
+      <body className={`${geistSans.variable} font-sans antialiased`}>
         {children}
         <Toaster />
       </body>
