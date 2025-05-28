@@ -18,12 +18,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Home() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useLocalStorage<Customer[]>("elanet_customers", []);
+  const [customers, setCustomers] = useLocalStorage<Customer[]>("elanet_customers_v2", []); // Changed key to avoid conflict if old data exists
   
   const [isCustomerFormOpen, setIsCustomerFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   
-  // PaymentDialog state is kept, but its trigger is currently removed from the main list.
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [payingCustomer, setPayingCustomer] = useState<Customer | null>(null);
   
@@ -48,14 +47,24 @@ export default function Home() {
   const handleSaveCustomer = (data: Omit<Customer, "id" | "status" | "nextPaymentDate" | "paymentHistory"> & { installationDate: string }) => {
     if (editingCustomer) {
       setCustomers(prev => 
-        prev.map(c => c.id === editingCustomer.id ? { ...editingCustomer, ...data, installationDate: data.installationDate } : c)
+        prev.map(c => c.id === editingCustomer.id ? { 
+            ...editingCustomer, 
+            ...data, 
+            installationDate: data.installationDate,
+            monthlyFee: Number(data.monthlyFee) // Ensure monthlyFee is number
+        } : c)
       );
       toast({ title: "Pelanggan Diperbarui", description: `Detail ${data.name} telah diperbarui.` });
     } else {
       const newCustomer: Customer = {
-        ...data,
         id: Date.now().toString(), // Simple ID generation
-        status: "Pending",
+        name: data.name,
+        phoneNumber: data.phoneNumber,
+        address: data.address,
+        plan: data.plan,
+        installationDate: data.installationDate,
+        monthlyFee: Number(data.monthlyFee), // Ensure monthlyFee is number
+        status: "Pending", // Default status for new customer
         nextPaymentDate: formatISO(addMonths(new Date(data.installationDate), 1)),
         paymentHistory: [],
       };
@@ -76,7 +85,6 @@ export default function Home() {
       const customerName = customers.find(c => c.id === customerToDeleteId)?.name || "Pelanggan";
       setCustomers(prev => prev.filter(c => c.id !== customerToDeleteId));
       toast({ title: "Pelanggan Dihapus", description: `${customerName} telah dihapus.`, variant: "destructive" });
-      // If deleting the customer being edited, close the form
       if (editingCustomer?.id === customerToDeleteId) {
         setIsCustomerFormOpen(false);
         setEditingCustomer(null);
@@ -86,7 +94,6 @@ export default function Home() {
     setCustomerToDeleteId(null);
   };
 
-  // This function's trigger from the main list is removed. Kept for potential future use.
   const handleOpenPaymentDialog = (customer: Customer) => {
     setPayingCustomer(customer);
     setIsPaymentDialogOpen(true);
@@ -128,24 +135,30 @@ export default function Home() {
     if (tab === "laporan") {
       handleShowInsights();
     }
-    // Placeholder for other tab actions
     if (tab === "beranda") {
       toast({ title: "Beranda", description: "Halaman Beranda belum diimplementasikan."});
     }
     if (tab === "pembayaran") {
-      toast({ title: "Pembayaran", description: "Fungsi Pembayaran belum diimplementasikan di tab ini."});
+       // For demo, let's open payment dialog for the first customer if any
+      if (customers.length > 0) {
+        // handleOpenPaymentDialog(customers[0]);
+         toast({ title: "Pembayaran", description: "Fungsi Pembayaran belum diimplementasikan di tab ini."});
+      } else {
+        toast({ title: "Pembayaran", description: "Tidak ada pelanggan untuk mencatat pembayaran."});
+      }
     }
   };
 
   const filteredCustomers = useMemo(() => {
     return customers.filter(customer =>
       customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.id.toLowerCase().includes(searchTerm.toLowerCase())
+      customer.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [customers, searchTerm]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background pb-16"> {/* Added pb-16 for bottom nav */}
+    <div className="min-h-screen flex flex-col bg-background pb-16">
       <PageHeader 
         title="Pelanggan"
         onAddCustomer={handleAddCustomer}
@@ -156,7 +169,7 @@ export default function Home() {
           <SearchBar 
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
-            placeholder="Cari pelanggan..."
+            placeholder="Cari pelanggan (nama, ID, telepon)..."
           />
           <ScrollArea className="flex-grow">
             {filteredCustomers.length > 0 ? (
@@ -176,11 +189,9 @@ export default function Home() {
         </>
       )}
 
-      {/* Placeholder content for other tabs - can be expanded later */}
       {activeTab === "beranda" && <div className="flex-grow flex items-center justify-center"><p className="text-muted-foreground">Halaman Beranda</p></div>}
       {activeTab === "pembayaran" && <div className="flex-grow flex items-center justify-center"><p className="text-muted-foreground">Halaman Pembayaran</p></div>}
-      {/* Laporan tab content is handled by PaymentInsightsModal */}
-       {activeTab === "laporan" && !isInsightsModalOpen && <div className="flex-grow flex items-center justify-center"><p className="text-muted-foreground">Memuat Laporan...</p></div>}
+      {activeTab === "laporan" && !isInsightsModalOpen && <div className="flex-grow flex items-center justify-center"><p className="text-muted-foreground">Memuat Laporan...</p></div>}
 
 
       <BottomNavigationBar activeTab={activeTab} onTabChange={handleTabChange} />
@@ -196,7 +207,6 @@ export default function Home() {
         onDelete={editingCustomer ? handleDeleteCustomerRequest : undefined}
       />
 
-      {/* PaymentDialog is kept but not actively triggered from the main list in this new UI */}
       <PaymentDialog
         isOpen={isPaymentDialogOpen}
         onClose={() => {

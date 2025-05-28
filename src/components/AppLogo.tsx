@@ -1,10 +1,17 @@
 import { Wifi } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-export function AppLogo() {
+interface AppLogoProps {
+  className?: string;
+  iconClassName?: string;
+  textClassName?: string;
+}
+
+export function AppLogo({ className, iconClassName, textClassName }: AppLogoProps) {
   return (
-    <div className="flex items-center gap-2 text-primary">
-      <Wifi className="h-8 w-8" />
-      <span className="text-2xl font-bold">ELANET</span>
+    <div className={cn("flex items-center gap-2 text-primary", className)}>
+      <Wifi className={cn("h-8 w-8", iconClassName)} />
+      <span className={cn("text-2xl font-bold", textClassName)}>ELANET</span>
     </div>
   );
 }

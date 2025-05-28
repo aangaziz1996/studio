@@ -6,15 +6,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// import { Label } from "@/components/ui/label"; // Not directly used
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
   DialogClose,
-  DialogDescription,
+  // DialogDescription, DialogFooter not used in this new layout directly
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -31,16 +29,24 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Trash2 } from "lucide-react";
+import { CalendarIcon, Trash2, XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
+import { id as indonesiaLocale } from 'date-fns/locale';
 import { useEffect } from "react";
+import { AppLogo } from "./AppLogo";
+import { ScrollArea } from "./ui/scroll-area";
 
 const customerSchema = z.object({
-  name: z.string().min(1, "Nama wajib diisi"),
+  name: z.string().min(1, "Nama pelanggan wajib diisi"),
+  phoneNumber: z.string().min(1, "Nomor telepon wajib diisi").regex(/^\+?[0-9\s-]{7,}$/, "Format nomor telepon tidak valid"),
   address: z.string().min(1, "Alamat wajib diisi"),
-  plan: z.string().min(1, "Paket langganan wajib diisi"),
-  installationDate: z.date({ required_error: "Tanggal instalasi wajib diisi" }),
+  plan: z.string().min(1, "Paket WiFi wajib diisi"),
+  installationDate: z.date({ required_error: "Tanggal pemasangan wajib diisi" }),
+  monthlyFee: z.preprocess(
+    (val) => parseFloat(String(val).replace(/[^0-9.-]+/g, "")), // Sanitize input for numbers
+    z.number({ invalid_type_error: "Biaya bulanan harus angka"}).min(0, "Biaya bulanan tidak boleh negatif")
+  ),
 });
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
@@ -62,142 +68,203 @@ export function CustomerForm({
 }: CustomerFormProps) {
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
-    // Default values will be set by useEffect to correctly handle dynamic defaultValues
   });
+
+  const isEditing = !!defaultValues?.id;
 
   useEffect(() => {
     if (isOpen) {
       form.reset({
         name: defaultValues?.name || "",
+        phoneNumber: defaultValues?.phoneNumber || "",
         address: defaultValues?.address || "",
         plan: defaultValues?.plan || "",
         installationDate: defaultValues?.installationDate ? parseISO(defaultValues.installationDate) : new Date(),
+        monthlyFee: defaultValues?.monthlyFee || 0,
       });
     }
   }, [isOpen, defaultValues, form]);
 
-
   const handleSubmit = (data: CustomerFormValues) => {
-    onSubmit({ ...data, installationDate: data.installationDate.toISOString() });
-    // form.reset(); // Reset is handled by useEffect on open now
-    // onClose(); // onClose should be called by the parent managing the dialog state
+    onSubmit({ 
+      ...data, 
+      installationDate: data.installationDate.toISOString(),
+      // Ensure monthlyFee is a number
+      monthlyFee: Number(data.monthlyFee) 
+    });
   };
-  
-  const isEditing = !!defaultValues?.id;
+
+  const inputClassName = "border-none focus-visible:ring-transparent text-base w-full bg-transparent py-0 h-auto placeholder:text-slate-400";
+  const formItemClassName = "bg-slate-100 p-1 rounded-xl shadow-sm"; // Lighter background for form items as per design
+  const formItemInnerPadding = "flex items-center p-3";
+  const formMessageClassName = "px-3 pb-2 pt-0 text-xs";
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) {
         onClose();
-        form.reset(); // Ensure form is reset when dialog is closed via overlay or X button
+        form.reset();
       }
     }}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Pelanggan" : "Tambah Pelanggan Baru"}</DialogTitle>
-          {isEditing && defaultValues?.name && <DialogDescription>Mengedit detail untuk {defaultValues.name}</DialogDescription>}
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nama</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nama Pelanggan" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="address"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Alamat</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Alamat Pelanggan" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="plan"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Paket Langganan</FormLabel>
-                  <FormControl>
-                    <Input placeholder="cth., 20 Mbps" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="installationDate"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Tanggal Instalasi</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
+      <DialogContent className="sm:max-w-lg w-full h-full flex flex-col p-0 overflow-hidden bg-slate-50"> {/* Main BG light grey */}
+        <div className="flex items-center justify-between p-4 border-b bg-white shadow-sm">
+          <DialogClose asChild>
+            <Button variant="ghost" size="icon" className="text-slate-600 hover:text-slate-900">
+              <XIcon className="h-6 w-6" />
+            </Button>
+          </DialogClose>
+          <h2 className="text-lg font-semibold text-slate-800">
+            {isEditing ? "Edit Pelanggan" : "Tambah Pelanggan"}
+          </h2>
+          <div className="w-10"></div> {/* Spacer */}
+        </div>
+
+        <ScrollArea className="flex-grow">
+          <div className="bg-emerald-600 text-white py-8 px-4 flex flex-col items-center justify-center">
+            <AppLogo className="text-white" iconClassName="h-12 w-12" textClassName="text-4xl"/>
+            <p className="text-xs mt-2 opacity-80 tracking-wider">NISINAL NATURLD SAFE WORK</p>
+          </div>
+
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="p-4 sm:p-6 space-y-5">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem className={formItemClassName}>
+                    <FormLabel className="sr-only">Nama Pelanggan</FormLabel>
+                    <div className={formItemInnerPadding}>
                       <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP", { locale: require('date-fns/locale/id') })
-                          ) : (
-                            <span>Pilih tanggal</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
+                        <Input placeholder="Nama Pelanggan" {...field} className={inputClassName} />
                       </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        initialFocus
-                        locale={require('date-fns/locale/id')}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <DialogFooter className="sm:justify-between">
-              {isEditing && onDelete && defaultValues?.id && (
-                <Button 
-                  type="button" 
-                  variant="destructive" 
-                  onClick={() => onDelete(defaultValues.id!)}
-                  className="sm:mr-auto"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Hapus
-                </Button>
-              )}
-              <div className="flex space-x-2 self-end mt-4 sm:mt-0">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">Batal</Button>
-                </DialogClose>
-                <Button type="submit">{isEditing ? "Simpan Perubahan" : "Simpan Pelanggan"}</Button>
-              </div>
-            </DialogFooter>
-          </form>
-        </Form>
+                    </div>
+                    <FormMessage className={formMessageClassName}/>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="phoneNumber"
+                render={({ field }) => (
+                  <FormItem className={formItemClassName}>
+                    <FormLabel className="sr-only">Nomor Telepon</FormLabel>
+                     <div className={formItemInnerPadding}>
+                      <FormControl>
+                        <Input type="tel" placeholder="Nomor Telepon" {...field} className={inputClassName} />
+                      </FormControl>
+                    </div>
+                    <FormMessage className={formMessageClassName}/>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem className={formItemClassName}>
+                    <FormLabel className="sr-only">Alamat</FormLabel>
+                     <div className={formItemInnerPadding}>
+                      <FormControl>
+                        <Input placeholder="Alamat" {...field} className={inputClassName} />
+                      </FormControl>
+                    </div>
+                    <FormMessage className={formMessageClassName}/>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="plan"
+                render={({ field }) => (
+                  <FormItem className={formItemClassName}>
+                    <FormLabel className="sr-only">Paket WiFi</FormLabel>
+                     <div className={formItemInnerPadding}>
+                      <FormControl>
+                        <Input placeholder="Paket WiFi" {...field} className={inputClassName} />
+                      </FormControl>
+                    </div>
+                    <FormMessage className={formMessageClassName}/>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="installationDate"
+                render={({ field }) => (
+                  <FormItem className={cn(formItemClassName, "p-0")}> {/* No padding for form item, button has padding */}
+                    <FormLabel className="sr-only">Tanggal Pemasangan</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"ghost"}
+                            className={cn(
+                              "w-full justify-between text-left font-normal h-auto text-base rounded-xl",
+                              formItemInnerPadding, // Reuse padding
+                              !field.value && "text-slate-400"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP", { locale: indonesiaLocale })
+                            ) : (
+                              <span>Tanggal Pemasangan</span>
+                            )}
+                            <CalendarIcon className="h-5 w-5 opacity-60" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                          locale={indonesiaLocale}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage className={cn(formMessageClassName, "px-3")}/>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="monthlyFee"
+                render={({ field }) => (
+                  <FormItem className={formItemClassName}>
+                    <FormLabel className="sr-only">Biaya Bulanan</FormLabel>
+                     <div className={formItemInnerPadding}>
+                      <FormControl>
+                        <Input type="number" placeholder="Biaya Bulanan" {...field} 
+                         onChange={e => field.onChange(parseFloat(e.target.value) || "")}
+                         className={inputClassName} />
+                      </FormControl>
+                    </div>
+                    <FormMessage className={formMessageClassName}/>
+                  </FormItem>
+                )}
+              />
+            </form>
+          </Form>
+        </ScrollArea>
+
+        <div className="p-4 sm:p-6 border-t bg-white">
+          {isEditing && onDelete && defaultValues?.id && (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => onDelete(defaultValues.id!)}
+              className="w-full mb-3"
+              size="lg"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Hapus Pelanggan
+            </Button>
+          )}
+          <Button type="button" onClick={form.handleSubmit(handleSubmit)} className="w-full bg-blue-500 hover:bg-blue-600 text-white" size="lg">
+            {isEditing ? "Simpan Perubahan" : "Simpan"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
