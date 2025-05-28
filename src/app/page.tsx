@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { SearchBar } from "@/components/SearchBar";
 import { CustomerListItem } from "@/components/CustomerListItem";
 import { BottomNavigationBar, type ActiveTab } from "@/components/BottomNavigationBar";
-import { CustomerForm } from "@/components/CustomerForm";
+import { CustomerForm, type CustomerFormValues } from "@/components/CustomerForm"; // Import CustomerFormValues
 import { PaymentInsightsModal } from "@/components/PaymentInsightsModal";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,7 @@ export default function Home() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [customerToDeleteId, setCustomerToDeleteId] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>("beranda"); // Default to beranda
+  const [activeTab, setActiveTab] = useState<ActiveTab>("beranda");
   const [searchTerm, setSearchTerm] = useState("");
 
   const [dashboardData, setDashboardData] = useState<DashboardData>({
@@ -78,15 +78,15 @@ export default function Home() {
     const calculatedNewCustomers = customers
       .filter(c => isWithinInterval(parseISO(c.installationDate), { start: thirtyDaysAgo, end: now }))
       .sort((a,b) => parseISO(b.installationDate).getTime() - parseISO(a.installationDate).getTime())
-      .slice(0, 5); // Limit to 5 for display
+      .slice(0, 5); 
 
     const sortedRecentPayments = allPayments
       .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())
-      .slice(0, 5); // Limit to 5 for display
+      .slice(0, 5); 
 
     setDashboardData({
       totalIncomeThisMonth: incomeThisMonth,
-      activeCustomersCount: customers.length, // Simplified: all customers are "active" for this count
+      activeCustomersCount: customers.length, 
       newCustomers: calculatedNewCustomers,
       recentPayments: sortedRecentPayments,
     });
@@ -98,7 +98,8 @@ export default function Home() {
     setIsCustomerFormOpen(true);
   };
 
-  const handleSaveCustomer = (data: Omit<Customer, "id" | "status" | "nextPaymentDate" | "paymentHistory"> & { installationDate: string }) => {
+  // Updated to accept CustomerFormValues
+  const handleSaveCustomer = (data: CustomerFormValues) => {
     const newCustomer: Customer = {
       id: Date.now().toString(),
       name: data.name,
@@ -106,9 +107,9 @@ export default function Home() {
       email: data.email,
       address: data.address,
       plan: data.plan,
-      installationDate: data.installationDate, // This should be included from the form
-      monthlyFee: Number(data.monthlyFee), // This should be included from the form
-      status: "Pending",
+      installationDate: data.installationDate, // From CustomerFormValues
+      monthlyFee: data.monthlyFee,             // From CustomerFormValues (already number)
+      status: "Pending", // New customers always start as Pending
       nextPaymentDate: formatISO(addMonths(new Date(data.installationDate), 1)),
       paymentHistory: [],
     };
@@ -141,7 +142,6 @@ export default function Home() {
     if (tab === "laporan") {
       handleShowInsights();
     }
-    // Beranda toast removed as it's now implemented
     if (tab === "pembayaran") {
       toast({ title: "Pembayaran", description: "Fungsi Pembayaran belum diimplementasikan di tab ini. Akses melalui Detail Pelanggan."});
     }
@@ -183,7 +183,7 @@ export default function Home() {
         </Button>
       );
     }
-    return <div className="w-10 h-10" />; // Placeholder for spacing
+    return <div className="w-10 h-10" />; 
   };
 
   return (
@@ -246,9 +246,8 @@ export default function Home() {
           setIsCustomerFormOpen(false);
         }}
         onSubmit={handleSaveCustomer}
-        // Pass all fields required by CustomerForm, installationDate and monthlyFee are needed for new customers
-        // For editing, these would come from defaultValues if the form was used for editing.
-        // Since this CustomerForm instance is only for adding, we don't set defaultValues.
+        // No defaultValues for adding new customer, so isEditing will be false
+        // onDelete is not provided for adding new customer
       />
       
       <PaymentInsightsModal

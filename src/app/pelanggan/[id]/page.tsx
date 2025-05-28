@@ -61,9 +61,9 @@ export default function CustomerDetailPage() {
         c.id === customer.id
           ? {
               ...c,
-              status: "Paid", // Automatically set to Paid on new payment
+              status: "Paid", 
               paymentHistory: [...c.paymentHistory, newPayment].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()),
-              nextPaymentDate: formatISO(addMonths(parseISO(c.nextPaymentDate), 1)) // Ensure nextPaymentDate is parsed before adding months
+              nextPaymentDate: formatISO(addMonths(parseISO(c.nextPaymentDate), 1)) 
             }
           : c
       )
@@ -72,26 +72,30 @@ export default function CustomerDetailPage() {
     setIsPaymentDialogOpen(false);
   };
   
-  // Updated to accept CustomerFormValues (name, phoneNumber, email, address, plan, status)
   const handleSaveCustomer = (data: CustomerFormValues) => {
     if (!customer) return;
+    // For editing, installationDate and monthlyFee are not on the form,
+    // so we preserve them from the existing customer object.
+    // The CustomerFormValues 'data' will have these fields from form state,
+    // but we only use the ones relevant to the edit form design.
     setCustomers(prev => 
       prev.map(c => c.id === customer.id ? { 
-          ...customer, // Keep existing full customer data
-          // Update only fields from the form
+          ...customer, // Keep existing full customer data (includes original installDate, monthlyFee)
           name: data.name,
           phoneNumber: data.phoneNumber,
           email: data.email,
           address: data.address,
           plan: data.plan,
           status: data.status, // Update status from form
+          // installationDate and monthlyFee are NOT updated from 'data' here
+          // as they are not part of the "Edit Customer" form UI.
       } : c)
     );
     toast({ title: "Pelanggan Diperbarui", description: `Detail ${data.name} telah diperbarui.` });
     setIsCustomerFormOpen(false);
   };
 
-  const handleDeleteCustomerRequest = () => {
+  const handleDeleteCustomerRequest = () => { // No longer takes customerId
     setIsDeleteDialogOpen(true);
   };
   
@@ -251,8 +255,8 @@ export default function CustomerDetailPage() {
         isOpen={isCustomerFormOpen}
         onClose={() => setIsCustomerFormOpen(false)}
         onSubmit={handleSaveCustomer}
-        defaultValues={customer} 
-        onDelete={undefined} 
+        defaultValues={customer} // Pass full customer object as defaultValues
+        onDelete={handleDeleteCustomerRequest} // Pass the delete handler
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -260,7 +264,7 @@ export default function CustomerDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Pelanggan?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tindakan ini akan menghapus data {customer.name} secara permanen. Apakah Anda yakin?
+              Tindakan ini akan menghapus data {customer?.name || 'pelanggan ini'} secara permanen. Apakah Anda yakin?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -275,4 +279,3 @@ export default function CustomerDetailPage() {
     </div>
   );
 }
-

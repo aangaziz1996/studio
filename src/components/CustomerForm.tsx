@@ -29,20 +29,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Customer, CustomerStatus } from "@/lib/types";
-import { Trash2, XIcon, Mail, User, Phone, MapPin, Tag, Activity } from "lucide-react";
+import { Trash2, XIcon, Mail, User, Phone, MapPin, Tag, Activity, CalendarDays, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect } from "react";
 import { AppLogo } from "./AppLogo";
 import { ScrollArea } from "./ui/scroll-area";
+import { formatISO } from "date-fns";
 
 const customerStatusValues: [CustomerStatus, ...CustomerStatus[]] = ['Pending', 'Paid', 'Overdue'];
 
+// Schema now includes installationDate and monthlyFee
 const customerSchema = z.object({
   name: z.string().min(1, "Nama pelanggan wajib diisi"),
   phoneNumber: z.string().min(1, "Nomor telepon wajib diisi").regex(/^\+?[0-9\s-]{7,}$/, "Format nomor telepon tidak valid"),
   email: z.string().email("Format email tidak valid").optional().or(z.literal("")),
   address: z.string().min(1, "Alamat wajib diisi"),
   plan: z.string().min(1, "Paket WiFi wajib diisi"),
+  
+  installationDate: z.string().refine(date => date.length > 0, { message: "Tanggal pemasangan wajib diisi" }),
+  monthlyFee: z.preprocess(
+    (val) => {
+      if (typeof val === 'string' && val.trim() !== '') return Number(val);
+      if (typeof val === 'number') return val;
+      return undefined; 
+    },
+    z.number({ required_error: "Biaya bulanan wajib diisi", invalid_type_error: "Biaya bulanan harus angka" }).positive("Biaya bulanan harus angka positif")
+  ),
+  
   status: z.enum(customerStatusValues, { required_error: "Status wajib dipilih" }),
 });
 
@@ -52,8 +65,8 @@ interface CustomerFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: CustomerFormValues) => void;
-  defaultValues?: Partial<Customer>;
-  onDelete?: (customerId: string) => void;
+  defaultValues?: Partial<Customer>; // Includes all Customer fields for editing
+  onDelete?: () => void; // Changed from (customerId: string) => void
 }
 
 export function CustomerForm({
@@ -63,20 +76,13 @@ export function CustomerForm({
   defaultValues,
   onDelete,
 }: CustomerFormProps) {
-  const form = useForm<CustomerFormValues>({
-    resolver: zodResolver(customerSchema),
-    defaultValues: {
-      name: "",
-      phoneNumber: "",
-      email: "",
-      address: "",
-      plan: "",
-      status: "Pending",
-    }
-  });
-
   const isEditing = !!defaultValues?.id;
 
+  const form = useForm<CustomerFormValues>({
+    resolver: zodResolver(customerSchema),
+    // Default values will be set in useEffect to handle isEditing logic for installationDate/monthlyFee
+  });
+  
   useEffect(() => {
     if (isOpen) {
       form.reset({
@@ -85,17 +91,20 @@ export function CustomerForm({
         email: defaultValues?.email || "",
         address: defaultValues?.address || "",
         plan: defaultValues?.plan || "",
+        // Set defaults for ALL schema fields, handling add vs edit
+        installationDate: defaultValues?.installationDate || (isEditing ? "" : formatISO(new Date(), { representation: 'date' })),
+        monthlyFee: defaultValues?.monthlyFee || (isEditing ? undefined : undefined), // Let placeholder show for new, or use "" for string input
         status: defaultValues?.status || "Pending",
       });
     }
-  }, [isOpen, defaultValues, form]);
+  }, [isOpen, defaultValues, form, isEditing]);
 
   const handleSubmit = (data: CustomerFormValues) => {
     onSubmit(data);
   };
 
-  const inputClassName = "text-base placeholder:text-slate-400"; // Standard input with border
-  const formItemClassName = "space-y-1"; // Simpler FormItem without background
+  const inputClassName = "text-base placeholder:text-slate-400";
+  const formItemClassName = "space-y-1";
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -203,6 +212,56 @@ export function CustomerForm({
                   </FormItem>
                 )}
               />
+
+              {!isEditing && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="installationDate"
+                    render={({ field }) => (
+                      <FormItem className={formItemClassName}>
+                        <FormLabel className="text-sm font-medium text-slate-700">Tanggal Pemasangan</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center bg-white p-3 rounded-lg border border-input">
+                            <CalendarDays className="h-5 w-5 text-slate-400 mr-2" />
+                            <Input 
+                              type="date" 
+                              placeholder="YYYY-MM-DD" 
+                              {...field} 
+                              className={cn(inputClassName, "border-none focus-visible:ring-transparent py-0 h-auto bg-transparent w-full")} 
+                             />
+                          </div>
+                        </FormControl>
+                        <FormMessage className="text-xs"/>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="monthlyFee"
+                    render={({ field }) => (
+                      <FormItem className={formItemClassName}>
+                        <FormLabel className="text-sm font-medium text-slate-700">Biaya Bulanan (Rp)</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center bg-white p-3 rounded-lg border border-input">
+                            <DollarSign className="h-5 w-5 text-slate-400 mr-2" />
+                            <Input 
+                              type="number" // Changed to number for better input control
+                              placeholder="Contoh: 150000" 
+                              {...field}
+                              onChange={e => field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))}
+                              value={field.value === undefined ? '' : field.value}
+                              className={cn(inputClassName, "border-none focus-visible:ring-transparent py-0 h-auto bg-transparent w-full")} 
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage className="text-xs"/>
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
+
               {isEditing && (
                 <FormField
                   control={form.control}
@@ -235,11 +294,11 @@ export function CustomerForm({
         </ScrollArea>
 
         <div className="p-4 sm:p-6 border-t bg-white">
-          {isEditing && onDelete && defaultValues?.id && (
+          {isEditing && onDelete && ( // No need to check defaultValues.id here, isEditing implies it
             <Button
               type="button"
               variant="destructive"
-              onClick={() => onDelete(defaultValues.id!)}
+              onClick={() => onDelete()} // Call onDelete without ID
               className="w-full mb-3"
               size="lg"
             >
