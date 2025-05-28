@@ -10,11 +10,12 @@ export type CustomerStatus = 'Paid' | 'Pending' | 'Overdue';
 export type Customer = {
   id: string;
   name: string;
-  phoneNumber: string; // Added new field
+  phoneNumber: string;
+  email?: string; // Added email field, optional
   address: string;
   plan: string; // Represents "Paket WiFi"
   installationDate: string; // ISO string
-  monthlyFee: number; // Added new field
+  monthlyFee: number;
   status: CustomerStatus;
   nextPaymentDate: string; // ISO string
   paymentHistory: Payment[];

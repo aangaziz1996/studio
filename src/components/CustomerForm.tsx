@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
-  // DialogDescription, DialogFooter not used in this new layout directly
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -29,7 +28,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Trash2, XIcon } from "lucide-react";
+import { CalendarIcon, Trash2, XIcon, Mail } from "lucide-react"; // Added Mail icon
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { id as indonesiaLocale } from 'date-fns/locale';
@@ -40,11 +39,12 @@ import { ScrollArea } from "./ui/scroll-area";
 const customerSchema = z.object({
   name: z.string().min(1, "Nama pelanggan wajib diisi"),
   phoneNumber: z.string().min(1, "Nomor telepon wajib diisi").regex(/^\+?[0-9\s-]{7,}$/, "Format nomor telepon tidak valid"),
+  email: z.string().email("Format email tidak valid").optional().or(z.literal("")), // Email is optional
   address: z.string().min(1, "Alamat wajib diisi"),
   plan: z.string().min(1, "Paket WiFi wajib diisi"),
   installationDate: z.date({ required_error: "Tanggal pemasangan wajib diisi" }),
   monthlyFee: z.preprocess(
-    (val) => parseFloat(String(val).replace(/[^0-9.-]+/g, "")), // Sanitize input for numbers
+    (val) => parseFloat(String(val).replace(/[^0-9.-]+/g, "")),
     z.number({ invalid_type_error: "Biaya bulanan harus angka"}).min(0, "Biaya bulanan tidak boleh negatif")
   ),
 });
@@ -55,7 +55,7 @@ interface CustomerFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: Omit<Customer, "id" | "status" | "nextPaymentDate" | "paymentHistory"> & { installationDate: string }) => void;
-  defaultValues?: Partial<Customer>;
+  defaultValues?: Partial<Customer>; // Keep defaultValues for potential editing use later
   onDelete?: (customerId: string) => void;
 }
 
@@ -68,6 +68,18 @@ export function CustomerForm({
 }: CustomerFormProps) {
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
+    defaultValues: {
+      name: "",
+      phoneNumber: "",
+      email: "",
+      address: "",
+      plan: "",
+      installationDate: new Date(),
+      monthlyFee: 0,
+      ...defaultValues, // Apply defaultValues if provided (for editing)
+      installationDate: defaultValues?.installationDate ? parseISO(defaultValues.installationDate) : new Date(),
+      monthlyFee: defaultValues?.monthlyFee ?? 0, // Ensure monthlyFee has a default
+    }
   });
 
   const isEditing = !!defaultValues?.id;
@@ -77,10 +89,11 @@ export function CustomerForm({
       form.reset({
         name: defaultValues?.name || "",
         phoneNumber: defaultValues?.phoneNumber || "",
+        email: defaultValues?.email || "",
         address: defaultValues?.address || "",
         plan: defaultValues?.plan || "",
         installationDate: defaultValues?.installationDate ? parseISO(defaultValues.installationDate) : new Date(),
-        monthlyFee: defaultValues?.monthlyFee || 0,
+        monthlyFee: defaultValues?.monthlyFee ?? 0,
       });
     }
   }, [isOpen, defaultValues, form]);
@@ -89,13 +102,12 @@ export function CustomerForm({
     onSubmit({ 
       ...data, 
       installationDate: data.installationDate.toISOString(),
-      // Ensure monthlyFee is a number
       monthlyFee: Number(data.monthlyFee) 
     });
   };
 
   const inputClassName = "border-none focus-visible:ring-transparent text-base w-full bg-transparent py-0 h-auto placeholder:text-slate-400";
-  const formItemClassName = "bg-slate-100 p-1 rounded-xl shadow-sm"; // Lighter background for form items as per design
+  const formItemClassName = "bg-slate-100 p-1 rounded-xl shadow-sm";
   const formItemInnerPadding = "flex items-center p-3";
   const formMessageClassName = "px-3 pb-2 pt-0 text-xs";
 
@@ -103,10 +115,10 @@ export function CustomerForm({
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) {
         onClose();
-        form.reset();
+        // form.reset(); // Reset is handled by useEffect based on defaultValues
       }
     }}>
-      <DialogContent className="sm:max-w-lg w-full h-full flex flex-col p-0 overflow-hidden bg-slate-50"> {/* Main BG light grey */}
+      <DialogContent className="sm:max-w-lg w-full h-full flex flex-col p-0 overflow-hidden bg-slate-50">
         <div className="flex items-center justify-between p-4 border-b bg-white shadow-sm">
           <DialogClose asChild>
             <Button variant="ghost" size="icon" className="text-slate-600 hover:text-slate-900">
@@ -120,7 +132,7 @@ export function CustomerForm({
         </div>
 
         <ScrollArea className="flex-grow">
-          <div className="bg-emerald-600 text-white py-8 px-4 flex flex-col items-center justify-center">
+          <div className="bg-emerald-700 text-white py-8 px-4 flex flex-col items-center justify-center">
             <AppLogo className="text-white" iconClassName="h-12 w-12" textClassName="text-4xl"/>
             <p className="text-xs mt-2 opacity-80 tracking-wider">NISINAL NATURLD SAFE WORK</p>
           </div>
@@ -151,6 +163,22 @@ export function CustomerForm({
                      <div className={formItemInnerPadding}>
                       <FormControl>
                         <Input type="tel" placeholder="Nomor Telepon" {...field} className={inputClassName} />
+                      </FormControl>
+                    </div>
+                    <FormMessage className={formMessageClassName}/>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem className={formItemClassName}>
+                    <FormLabel className="sr-only">Email</FormLabel>
+                     <div className={formItemInnerPadding}>
+                      <Mail className="h-5 w-5 text-slate-400 mr-2" />
+                      <FormControl>
+                        <Input type="email" placeholder="Email (opsional)" {...field} className={inputClassName} />
                       </FormControl>
                     </div>
                     <FormMessage className={formMessageClassName}/>
@@ -191,7 +219,7 @@ export function CustomerForm({
                 control={form.control}
                 name="installationDate"
                 render={({ field }) => (
-                  <FormItem className={cn(formItemClassName, "p-0")}> {/* No padding for form item, button has padding */}
+                  <FormItem className={cn(formItemClassName, "p-0")}>
                     <FormLabel className="sr-only">Tanggal Pemasangan</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
@@ -200,7 +228,7 @@ export function CustomerForm({
                             variant={"ghost"}
                             className={cn(
                               "w-full justify-between text-left font-normal h-auto text-base rounded-xl",
-                              formItemInnerPadding, // Reuse padding
+                              formItemInnerPadding,
                               !field.value && "text-slate-400"
                             )}
                           >
@@ -235,7 +263,7 @@ export function CustomerForm({
                     <FormLabel className="sr-only">Biaya Bulanan</FormLabel>
                      <div className={formItemInnerPadding}>
                       <FormControl>
-                        <Input type="number" placeholder="Biaya Bulanan" {...field} 
+                        <Input type="number" placeholder="Biaya Bulanan (Rp)" {...field} 
                          onChange={e => field.onChange(parseFloat(e.target.value) || "")}
                          className={inputClassName} />
                       </FormControl>
@@ -262,7 +290,7 @@ export function CustomerForm({
             </Button>
           )}
           <Button type="button" onClick={form.handleSubmit(handleSubmit)} className="w-full bg-blue-500 hover:bg-blue-600 text-white" size="lg">
-            {isEditing ? "Simpan Perubahan" : "Simpan"}
+            {isEditing ? "Simpan Perubahan" : "Simpan Pelanggan"}
           </Button>
         </div>
       </DialogContent>

@@ -2,12 +2,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchBar } from "@/components/SearchBar";
 import { CustomerListItem } from "@/components/CustomerListItem";
 import { BottomNavigationBar, type ActiveTab } from "@/components/BottomNavigationBar";
 import { CustomerForm } from "@/components/CustomerForm";
-import { PaymentDialog } from "@/components/PaymentDialog"; // Kept for potential future use
+// PaymentDialog is now primarily used in the customer detail page
+// import { PaymentDialog } from "@/components/PaymentDialog"; 
 import { PaymentInsightsModal } from "@/components/PaymentInsightsModal";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -18,13 +20,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Home() {
   const { toast } = useToast();
-  const [customers, setCustomers] = useLocalStorage<Customer[]>("elanet_customers_v2", []); // Changed key to avoid conflict if old data exists
+  const router = useRouter();
+  const [customers, setCustomers] = useLocalStorage<Customer[]>("elanet_customers_v2", []);
   
   const [isCustomerFormOpen, setIsCustomerFormOpen] = useState(false);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  // Editing customer state is removed, editing will be handled on detail page or if re-introduced here
+  // const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [payingCustomer, setPayingCustomer] = useState<Customer | null>(null);
+  // Payment Dialog state is removed, it's on detail page now
+  // const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  // const [payingCustomer, setPayingCustomer] = useState<Customer | null>(null);
   
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false);
   
@@ -35,44 +40,36 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const handleAddCustomer = () => {
-    setEditingCustomer(null);
+    // setEditingCustomer(null); // No longer needed here
     setIsCustomerFormOpen(true);
   };
 
-  const handleEditCustomer = (customer: Customer) => {
-    setEditingCustomer(customer);
-    setIsCustomerFormOpen(true);
-  };
+  // handleEditCustomer now navigates to the detail page
+  // const handleEditCustomer = (customer: Customer) => {
+  //   router.push(`/pelanggan/${customer.id}`);
+  // };
 
   const handleSaveCustomer = (data: Omit<Customer, "id" | "status" | "nextPaymentDate" | "paymentHistory"> & { installationDate: string }) => {
-    if (editingCustomer) {
-      setCustomers(prev => 
-        prev.map(c => c.id === editingCustomer.id ? { 
-            ...editingCustomer, 
-            ...data, 
-            installationDate: data.installationDate,
-            monthlyFee: Number(data.monthlyFee) // Ensure monthlyFee is number
-        } : c)
-      );
-      toast({ title: "Pelanggan Diperbarui", description: `Detail ${data.name} telah diperbarui.` });
-    } else {
-      const newCustomer: Customer = {
-        id: Date.now().toString(), // Simple ID generation
-        name: data.name,
-        phoneNumber: data.phoneNumber,
-        address: data.address,
-        plan: data.plan,
-        installationDate: data.installationDate,
-        monthlyFee: Number(data.monthlyFee), // Ensure monthlyFee is number
-        status: "Pending", // Default status for new customer
-        nextPaymentDate: formatISO(addMonths(new Date(data.installationDate), 1)),
-        paymentHistory: [],
-      };
-      setCustomers(prev => [...prev, newCustomer]);
-      toast({ title: "Pelanggan Ditambahkan", description: `${data.name} telah ditambahkan.` });
-    }
+    // Simplified: assume this is only for new customers from this page for now
+    // If editing is re-introduced here, logic for editingCustomer would be needed
+    const newCustomer: Customer = {
+      id: Date.now().toString(),
+      name: data.name,
+      phoneNumber: data.phoneNumber,
+      email: data.email,
+      address: data.address,
+      plan: data.plan,
+      installationDate: data.installationDate,
+      monthlyFee: Number(data.monthlyFee),
+      status: "Pending",
+      nextPaymentDate: formatISO(addMonths(new Date(data.installationDate), 1)),
+      paymentHistory: [],
+    };
+    setCustomers(prev => [...prev, newCustomer]);
+    toast({ title: "Pelanggan Ditambahkan", description: `${data.name} telah ditambahkan.` });
+    
     setIsCustomerFormOpen(false);
-    setEditingCustomer(null);
+    // setEditingCustomer(null); // No longer needed here
   };
 
   const handleDeleteCustomerRequest = (customerId: string) => {
@@ -85,46 +82,20 @@ export default function Home() {
       const customerName = customers.find(c => c.id === customerToDeleteId)?.name || "Pelanggan";
       setCustomers(prev => prev.filter(c => c.id !== customerToDeleteId));
       toast({ title: "Pelanggan Dihapus", description: `${customerName} telah dihapus.`, variant: "destructive" });
-      if (editingCustomer?.id === customerToDeleteId) {
-        setIsCustomerFormOpen(false);
-        setEditingCustomer(null);
-      }
+      // if (editingCustomer?.id === customerToDeleteId) { // No longer needed here
+      //   setIsCustomerFormOpen(false);
+      //   setEditingCustomer(null);
+      // }
     }
     setIsDeleteDialogOpen(false);
     setCustomerToDeleteId(null);
   };
 
-  const handleOpenPaymentDialog = (customer: Customer) => {
-    setPayingCustomer(customer);
-    setIsPaymentDialogOpen(true);
-  };
+  // handleOpenPaymentDialog is removed, it's on detail page
+  // const handleOpenPaymentDialog = (customer: Customer) => { ... }
 
-  const handleRecordPayment = (paymentData: Omit<Payment, "id" | "date">, signature: string) => {
-    if (!payingCustomer) return;
-
-    const newPayment: Payment = {
-      ...paymentData,
-      id: Date.now().toString(),
-      date: formatISO(new Date()),
-      signature: signature,
-    };
-
-    setCustomers(prev => 
-      prev.map(c => 
-        c.id === payingCustomer.id 
-        ? { 
-            ...c, 
-            status: "Paid",
-            paymentHistory: [...c.paymentHistory, newPayment],
-            nextPaymentDate: formatISO(addMonths(new Date(c.nextPaymentDate), 1))
-          } 
-        : c
-      )
-    );
-    toast({ title: "Pembayaran Dicatat", description: `Pembayaran untuk ${payingCustomer.name} telah dicatat.` });
-    setIsPaymentDialogOpen(false);
-    setPayingCustomer(null);
-  };
+  // handleRecordPayment is removed, it's on detail page
+  // const handleRecordPayment = (paymentData: Omit<Payment, "id" | "date">, signature: string) => { ... }
   
   const handleShowInsights = () => {
     setIsInsightsModalOpen(true);
@@ -139,13 +110,7 @@ export default function Home() {
       toast({ title: "Beranda", description: "Halaman Beranda belum diimplementasikan."});
     }
     if (tab === "pembayaran") {
-       // For demo, let's open payment dialog for the first customer if any
-      if (customers.length > 0) {
-        // handleOpenPaymentDialog(customers[0]);
-         toast({ title: "Pembayaran", description: "Fungsi Pembayaran belum diimplementasikan di tab ini."});
-      } else {
-        toast({ title: "Pembayaran", description: "Tidak ada pelanggan untuk mencatat pembayaran."});
-      }
+      toast({ title: "Pembayaran", description: "Fungsi Pembayaran belum diimplementasikan di tab ini. Akses melalui Detail Pelanggan."});
     }
   };
 
@@ -153,8 +118,9 @@ export default function Home() {
     return customers.filter(customer =>
       customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+      customer.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()))
+    ).sort((a, b) => a.name.localeCompare(b.name)); // Sort by name
   }, [customers, searchTerm]);
 
   return (
@@ -169,7 +135,7 @@ export default function Home() {
           <SearchBar 
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
-            placeholder="Cari pelanggan (nama, ID, telepon)..."
+            placeholder="Cari pelanggan (nama, ID, telepon, email)..."
           />
           <ScrollArea className="flex-grow">
             {filteredCustomers.length > 0 ? (
@@ -177,7 +143,7 @@ export default function Home() {
                 <CustomerListItem 
                   key={customer.id} 
                   customer={customer} 
-                  onClick={handleEditCustomer}
+                  // onClick prop removed, navigation handled internally
                 />
               ))
             ) : (
@@ -200,13 +166,14 @@ export default function Home() {
         isOpen={isCustomerFormOpen}
         onClose={() => {
           setIsCustomerFormOpen(false);
-          setEditingCustomer(null);
+          // setEditingCustomer(null); // No longer needed here
         }}
         onSubmit={handleSaveCustomer}
-        defaultValues={editingCustomer || undefined}
-        onDelete={editingCustomer ? handleDeleteCustomerRequest : undefined}
+        // defaultValues removed, this form is now only for adding new customer from this page
+        // onDelete prop is also removed for add form. Deletion is handled on detail page or via swipe in future.
       />
 
+      {/* PaymentDialog is no longer invoked directly from this page 
       <PaymentDialog
         isOpen={isPaymentDialogOpen}
         onClose={() => {
@@ -216,6 +183,7 @@ export default function Home() {
         customer={payingCustomer}
         onRecordPayment={handleRecordPayment}
       />
+      */}
       
       <PaymentInsightsModal
         isOpen={isInsightsModalOpen}
@@ -229,6 +197,7 @@ export default function Home() {
             <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
             <AlertDialogDescription>
               Tindakan ini tidak dapat dibatalkan. Ini akan menghapus data pelanggan secara permanen.
+              Pengguna yang dihapus dari sini mungkin masih perlu konfirmasi dari halaman detail jika dibuka.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

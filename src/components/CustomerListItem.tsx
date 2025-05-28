@@ -3,13 +3,16 @@
 
 import type { Customer } from "@/lib/types";
 import Image from "next/image";
+import { useRouter } from "next/navigation"; // Import useRouter
 
 interface CustomerListItemProps {
   customer: Customer;
-  onClick: (customer: Customer) => void;
+  // onClick will be handled by navigation now
 }
 
-export function CustomerListItem({ customer, onClick }: CustomerListItemProps) {
+export function CustomerListItem({ customer }: CustomerListItemProps) {
+  const router = useRouter(); // Initialize router
+
   // Simple hashing function to get a somewhat consistent placeholder image variant
   const getPlaceholderVariant = (id: string) => {
     let hash = 0;
@@ -18,22 +21,23 @@ export function CustomerListItem({ customer, onClick }: CustomerListItemProps) {
       hash = ((hash << 5) - hash) + char;
       hash |= 0; // Convert to 32bit integer
     }
-    // Use a few variants based on the hash
-    return Math.abs(hash % 3); // 0, 1, or 2
+    return Math.abs(hash % 3);
   };
   
   const variant = getPlaceholderVariant(customer.id);
-  // For simplicity, we'll use the same male/female hint but vary the placeholder slightly
   const placeholderGenderHint = variant % 2 === 0 ? "man portrait" : "woman portrait";
 
+  const handleClick = () => {
+    router.push(`/pelanggan/${customer.id}`); // Navigate to detail page
+  };
 
   return (
     <div
       className="flex items-center p-4 space-x-4 hover:bg-muted cursor-pointer border-b border-border"
-      onClick={() => onClick(customer)}
+      onClick={handleClick}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(customer);}}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick();}}
     >
       <Image
         src={`https://placehold.co/40x40.png?variant=${variant}`}
