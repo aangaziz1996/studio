@@ -28,11 +28,12 @@ export function BottomNavigationBar({ activeTab, onTabChange }: BottomNavigation
             onClick={() => onTabChange(item.id)}
             className={cn(
               "flex flex-col items-center justify-center space-y-1 p-2 rounded-md transition-colors",
-              "w-1/4", // Distribute width equally
+              "w-1/4", 
               activeTab === item.id
                 ? "text-primary"
                 : "text-muted-foreground hover:text-foreground"
             )}
+            aria-current={activeTab === item.id ? "page" : undefined}
           >
             <item.icon className="h-6 w-6" />
             <span className="text-xs font-medium">{item.label}</span>
