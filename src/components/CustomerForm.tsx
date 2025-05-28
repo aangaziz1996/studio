@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -5,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+// import { Label } from "@/components/ui/label"; // Not directly used
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
   DialogClose,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -29,15 +31,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
+import { useEffect } from "react";
 
 const customerSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  address: z.string().min(1, "Address is required"),
-  plan: z.string().min(1, "Plan is required"),
-  installationDate: z.date({ required_error: "Installation date is required" }),
+  name: z.string().min(1, "Nama wajib diisi"),
+  address: z.string().min(1, "Alamat wajib diisi"),
+  plan: z.string().min(1, "Paket langganan wajib diisi"),
+  installationDate: z.date({ required_error: "Tanggal instalasi wajib diisi" }),
 });
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
@@ -47,6 +50,7 @@ interface CustomerFormProps {
   onClose: () => void;
   onSubmit: (data: Omit<Customer, "id" | "status" | "nextPaymentDate" | "paymentHistory"> & { installationDate: string }) => void;
   defaultValues?: Partial<Customer>;
+  onDelete?: (customerId: string) => void;
 }
 
 export function CustomerForm({
@@ -54,28 +58,44 @@ export function CustomerForm({
   onClose,
   onSubmit,
   defaultValues,
+  onDelete,
 }: CustomerFormProps) {
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
-    defaultValues: {
-      name: defaultValues?.name || "",
-      address: defaultValues?.address || "",
-      plan: defaultValues?.plan || "",
-      installationDate: defaultValues?.installationDate ? parseISO(defaultValues.installationDate) : new Date(),
-    },
+    // Default values will be set by useEffect to correctly handle dynamic defaultValues
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      form.reset({
+        name: defaultValues?.name || "",
+        address: defaultValues?.address || "",
+        plan: defaultValues?.plan || "",
+        installationDate: defaultValues?.installationDate ? parseISO(defaultValues.installationDate) : new Date(),
+      });
+    }
+  }, [isOpen, defaultValues, form]);
+
 
   const handleSubmit = (data: CustomerFormValues) => {
     onSubmit({ ...data, installationDate: data.installationDate.toISOString() });
-    form.reset();
-    onClose();
+    // form.reset(); // Reset is handled by useEffect on open now
+    // onClose(); // onClose should be called by the parent managing the dialog state
   };
+  
+  const isEditing = !!defaultValues?.id;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        onClose();
+        form.reset(); // Ensure form is reset when dialog is closed via overlay or X button
+      }
+    }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{defaultValues?.id ? "Edit Customer" : "Add New Customer"}</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit Pelanggan" : "Tambah Pelanggan Baru"}</DialogTitle>
+          {isEditing && defaultValues?.name && <DialogDescription>Mengedit detail untuk {defaultValues.name}</DialogDescription>}
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
@@ -84,9 +104,9 @@ export function CustomerForm({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name</FormLabel>
+                  <FormLabel>Nama</FormLabel>
                   <FormControl>
-                    <Input placeholder="Customer Name" {...field} />
+                    <Input placeholder="Nama Pelanggan" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -97,9 +117,9 @@ export function CustomerForm({
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address</FormLabel>
+                  <FormLabel>Alamat</FormLabel>
                   <FormControl>
-                    <Input placeholder="Customer Address" {...field} />
+                    <Input placeholder="Alamat Pelanggan" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -110,9 +130,9 @@ export function CustomerForm({
               name="plan"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Subscription Plan</FormLabel>
+                  <FormLabel>Paket Langganan</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., 20 Mbps" {...field} />
+                    <Input placeholder="cth., 20 Mbps" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -123,7 +143,7 @@ export function CustomerForm({
               name="installationDate"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Installation Date</FormLabel>
+                  <FormLabel>Tanggal Instalasi</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -135,9 +155,9 @@ export function CustomerForm({
                           )}
                         >
                           {field.value ? (
-                            format(field.value, "PPP")
+                            format(field.value, "PPP", { locale: require('date-fns/locale/id') })
                           ) : (
-                            <span>Pick a date</span>
+                            <span>Pilih tanggal</span>
                           )}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button>
@@ -149,6 +169,7 @@ export function CustomerForm({
                         selected={field.value}
                         onSelect={field.onChange}
                         initialFocus
+                        locale={require('date-fns/locale/id')}
                       />
                     </PopoverContent>
                   </Popover>
@@ -156,11 +177,24 @@ export function CustomerForm({
                 </FormItem>
               )}
             />
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">Cancel</Button>
-              </DialogClose>
-              <Button type="submit">Save Customer</Button>
+            <DialogFooter className="sm:justify-between">
+              {isEditing && onDelete && defaultValues?.id && (
+                <Button 
+                  type="button" 
+                  variant="destructive" 
+                  onClick={() => onDelete(defaultValues.id!)}
+                  className="sm:mr-auto"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Hapus
+                </Button>
+              )}
+              <div className="flex space-x-2 self-end mt-4 sm:mt-0">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Batal</Button>
+                </DialogClose>
+                <Button type="submit">{isEditing ? "Simpan Perubahan" : "Simpan Pelanggan"}</Button>
+              </div>
             </DialogFooter>
           </form>
         </Form>

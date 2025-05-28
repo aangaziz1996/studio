@@ -1,3 +1,9 @@
+
+"use client";
+// This component is being replaced by PageHeader.tsx for the main page.
+// Keeping the old file in case it's used elsewhere or for reference.
+// For new main page header, see src/components/PageHeader.tsx
+
 import { Button } from "@/components/ui/button";
 import { AppLogo } from "@/components/AppLogo";
 import { PlusCircle, BarChartBig } from "lucide-react";

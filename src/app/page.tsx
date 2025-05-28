@@ -1,16 +1,20 @@
+
 "use client";
 
-import { useState, useEffect } from "react";
-import { Header } from "@/components/Header";
-import { CustomerTable } from "@/components/CustomerTable";
+import { useState, useEffect, useMemo } from "react";
+import { PageHeader } from "@/components/PageHeader";
+import { SearchBar } from "@/components/SearchBar";
+import { CustomerListItem } from "@/components/CustomerListItem";
+import { BottomNavigationBar, type ActiveTab } from "@/components/BottomNavigationBar";
 import { CustomerForm } from "@/components/CustomerForm";
-import { PaymentDialog } from "@/components/PaymentDialog";
+import { PaymentDialog } from "@/components/PaymentDialog"; // Kept for potential future use
 import { PaymentInsightsModal } from "@/components/PaymentInsightsModal";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import useLocalStorage from "@/hooks/useLocalStorage";
 import type { Customer, Payment } from "@/lib/types";
 import { addMonths, formatISO } from "date-fns";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function Home() {
   const { toast } = useToast();
@@ -19,6 +23,7 @@ export default function Home() {
   const [isCustomerFormOpen, setIsCustomerFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   
+  // PaymentDialog state is kept, but its trigger is currently removed from the main list.
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [payingCustomer, setPayingCustomer] = useState<Customer | null>(null);
   
@@ -26,6 +31,9 @@ export default function Home() {
   
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [customerToDeleteId, setCustomerToDeleteId] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>("pelanggan");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const handleAddCustomer = () => {
     setEditingCustomer(null);
@@ -40,9 +48,9 @@ export default function Home() {
   const handleSaveCustomer = (data: Omit<Customer, "id" | "status" | "nextPaymentDate" | "paymentHistory"> & { installationDate: string }) => {
     if (editingCustomer) {
       setCustomers(prev => 
-        prev.map(c => c.id === editingCustomer.id ? { ...editingCustomer, ...data } : c)
+        prev.map(c => c.id === editingCustomer.id ? { ...editingCustomer, ...data, installationDate: data.installationDate } : c)
       );
-      toast({ title: "Customer Updated", description: `${data.name}'s details have been updated.` });
+      toast({ title: "Pelanggan Diperbarui", description: `Detail ${data.name} telah diperbarui.` });
     } else {
       const newCustomer: Customer = {
         ...data,
@@ -52,27 +60,33 @@ export default function Home() {
         paymentHistory: [],
       };
       setCustomers(prev => [...prev, newCustomer]);
-      toast({ title: "Customer Added", description: `${data.name} has been added.` });
+      toast({ title: "Pelanggan Ditambahkan", description: `${data.name} telah ditambahkan.` });
     }
     setIsCustomerFormOpen(false);
     setEditingCustomer(null);
   };
 
-  const handleDeleteCustomer = (customerId: string) => {
+  const handleDeleteCustomerRequest = (customerId: string) => {
     setCustomerToDeleteId(customerId);
     setIsDeleteDialogOpen(true);
   };
   
   const confirmDeleteCustomer = () => {
     if (customerToDeleteId) {
-      const customerName = customers.find(c => c.id === customerToDeleteId)?.name || "Customer";
+      const customerName = customers.find(c => c.id === customerToDeleteId)?.name || "Pelanggan";
       setCustomers(prev => prev.filter(c => c.id !== customerToDeleteId));
-      toast({ title: "Customer Deleted", description: `${customerName} has been removed.`, variant: "destructive" });
+      toast({ title: "Pelanggan Dihapus", description: `${customerName} telah dihapus.`, variant: "destructive" });
+      // If deleting the customer being edited, close the form
+      if (editingCustomer?.id === customerToDeleteId) {
+        setIsCustomerFormOpen(false);
+        setEditingCustomer(null);
+      }
     }
     setIsDeleteDialogOpen(false);
     setCustomerToDeleteId(null);
   };
 
+  // This function's trigger from the main list is removed. Kept for potential future use.
   const handleOpenPaymentDialog = (customer: Customer) => {
     setPayingCustomer(customer);
     setIsPaymentDialogOpen(true);
@@ -95,12 +109,12 @@ export default function Home() {
             ...c, 
             status: "Paid",
             paymentHistory: [...c.paymentHistory, newPayment],
-            nextPaymentDate: formatISO(addMonths(new Date(c.nextPaymentDate), 1)) // Assuming monthly cycle
+            nextPaymentDate: formatISO(addMonths(new Date(c.nextPaymentDate), 1))
           } 
         : c
       )
     );
-    toast({ title: "Payment Recorded", description: `Payment for ${payingCustomer.name} has been recorded.` });
+    toast({ title: "Pembayaran Dicatat", description: `Pembayaran untuk ${payingCustomer.name} telah dicatat.` });
     setIsPaymentDialogOpen(false);
     setPayingCustomer(null);
   };
@@ -109,20 +123,67 @@ export default function Home() {
     setIsInsightsModalOpen(true);
   };
 
+  const handleTabChange = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    if (tab === "laporan") {
+      handleShowInsights();
+    }
+    // Placeholder for other tab actions
+    if (tab === "beranda") {
+      toast({ title: "Beranda", description: "Halaman Beranda belum diimplementasikan."});
+    }
+    if (tab === "pembayaran") {
+      toast({ title: "Pembayaran", description: "Fungsi Pembayaran belum diimplementasikan di tab ini."});
+    }
+  };
+
+  const filteredCustomers = useMemo(() => {
+    return customers.filter(customer =>
+      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.id.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [customers, searchTerm]);
+
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Header 
+    <div className="min-h-screen flex flex-col bg-background pb-16"> {/* Added pb-16 for bottom nav */}
+      <PageHeader 
+        title="Pelanggan"
         onAddCustomer={handleAddCustomer}
-        onShowInsights={handleShowInsights}
       />
-      <main className="flex-grow container mx-auto px-4 py-8">
-        <CustomerTable
-          customers={customers}
-          onEdit={handleEditCustomer}
-          onDelete={handleDeleteCustomer}
-          onRecordPayment={handleOpenPaymentDialog}
-        />
-      </main>
+      
+      {activeTab === "pelanggan" && (
+        <>
+          <SearchBar 
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            placeholder="Cari pelanggan..."
+          />
+          <ScrollArea className="flex-grow">
+            {filteredCustomers.length > 0 ? (
+              filteredCustomers.map(customer => (
+                <CustomerListItem 
+                  key={customer.id} 
+                  customer={customer} 
+                  onClick={handleEditCustomer}
+                />
+              ))
+            ) : (
+              <p className="text-center text-muted-foreground py-10">
+                {searchTerm ? "Pelanggan tidak ditemukan." : "Belum ada pelanggan. Tambahkan pelanggan baru."}
+              </p>
+            )}
+          </ScrollArea>
+        </>
+      )}
+
+      {/* Placeholder content for other tabs - can be expanded later */}
+      {activeTab === "beranda" && <div className="flex-grow flex items-center justify-center"><p className="text-muted-foreground">Halaman Beranda</p></div>}
+      {activeTab === "pembayaran" && <div className="flex-grow flex items-center justify-center"><p className="text-muted-foreground">Halaman Pembayaran</p></div>}
+      {/* Laporan tab content is handled by PaymentInsightsModal */}
+       {activeTab === "laporan" && !isInsightsModalOpen && <div className="flex-grow flex items-center justify-center"><p className="text-muted-foreground">Memuat Laporan...</p></div>}
+
+
+      <BottomNavigationBar activeTab={activeTab} onTabChange={handleTabChange} />
 
       <CustomerForm
         isOpen={isCustomerFormOpen}
@@ -132,8 +193,10 @@ export default function Home() {
         }}
         onSubmit={handleSaveCustomer}
         defaultValues={editingCustomer || undefined}
+        onDelete={editingCustomer ? handleDeleteCustomerRequest : undefined}
       />
 
+      {/* PaymentDialog is kept but not actively triggered from the main list in this new UI */}
       <PaymentDialog
         isOpen={isPaymentDialogOpen}
         onClose={() => {
@@ -153,15 +216,15 @@ export default function Home() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the customer record.
+              Tindakan ini tidak dapat dibatalkan. Ini akan menghapus data pelanggan secara permanen.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setCustomerToDeleteId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setCustomerToDeleteId(null)}>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteCustomer} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-              Delete
+              Hapus
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

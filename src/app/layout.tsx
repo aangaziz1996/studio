@@ -1,21 +1,23 @@
+
 import type {Metadata} from 'next';
-import {Geist, Geist_Mono} from 'next/font/google';
+import {Geist} from 'next/font/google'; // Using Geist Sans only for simplicity as per image
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'], // Adjusted weights
 });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
+// const geistMono = Geist_Mono({ // Removing Mono for now, not prominent in new design
+//   variable: '--font-geist-mono',
+//   subsets: ['latin'],
+// });
 
 export const metadata: Metadata = {
   title: 'ELANET Digital Ledger',
-  description: 'Manage customer payments for ELANET WiFi service.',
+  description: 'Kelola pembayaran pelanggan untuk layanan WiFi ELANET.',
 };
 
 export default function RootLayout({
@@ -24,8 +26,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="id"> {/* Changed lang to id */}
+      <body className={`${geistSans.variable} font-sans antialiased`}> {/* Use font-sans from variable */}
         {children}
         <Toaster />
       </body>
